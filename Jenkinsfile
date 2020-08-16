@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent {key 'jenkins'}
     environment {
         //be sure to replace "willbla" with your own Docker Hub username
         DOCKER_IMAGE_NAME = "abtayshete06/train-schedule"
