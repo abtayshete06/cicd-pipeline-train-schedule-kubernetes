@@ -1,9 +1,5 @@
 pipeline {
     agent any
-    environment {
-        //be sure to replace "willbla" with your own Docker Hub username
-        DOCKER_IMAGE_NAME = "abtayshete06/train-schedule"
-    }
     stages {
         stage('Build') {
             steps {
@@ -18,9 +14,9 @@ pipeline {
             }
             steps {
                 script {
-                    app = docker.build(DOCKER_IMAGE_NAME)
+                    app = docker.build("abtayshete06/train-schedule")
                     app.inside {
-                        sh 'echo Hello, World!'
+                        sh 'echo $(curl localhost:8080)'
                     }
                 }
             }
@@ -45,10 +41,17 @@ pipeline {
             steps {
                 input 'Deploy to Production?'
                 milestone(1)
-                kuberenetesDeploy{
-                    kubeconfigId: 'kubeconfig',
-                    configs: 'train-schedule-kube.yml',
-                    enableConfigSubstitution: true
+                withCredentials([usernamePassword(credentialsId: 'webserver_login', usernameVariable: 'USERNAME', passwordVariable: 'USERPASS')]) {
+                    script {
+                        sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \"docker pull abtayshete06/train-schedule:${env.BUILD_NUMBER}\""
+                        try {
+                            sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \"docker stop train-schedule\""
+                            sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \"docker rm train-schedule\""
+                        } catch (err) {
+                            echo: 'caught error: $err'
+                        }
+                        sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \"docker run --restart always --name train-schedule -p 8080:8080 -d abtayshete06/train-schedule:${env.BUILD_NUMBER}\""
+                    }
                 }
             }
         }
